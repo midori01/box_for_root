@@ -87,22 +87,3 @@ jobs:
           body: |
             #### Changelog v${{ github.event.inputs.tag }}
             ${{ github.event.inputs.changelog }}
-
-      # 7. Upload to Telegram
-      - name: Upload to Telegram
-        if: ${{ success() }}
-        env:
-          CHAT_ID: "-1001597117128"
-          MESSAGE_THREAD_ID: "282263"
-          API_ID: ${{ secrets.API_ID }}
-          API_HASH: ${{ secrets.API_HASH }}
-          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-        run: |
-          pip3 install --quiet telethon==1.31.1
-
-          FILE=$(find . -maxdepth 1 -type f -name "box_for_root-v*.zip" | head -n 1)
-          [ -z "$FILE" ] && echo "No ZIP file found!" && exit 1
-
-          export VERSION=$(git rev-parse --short HEAD)
-          export COMMIT=$(git log --oneline -n 10 --no-decorate | sed 's/^[0-9a-f]* //' | sed 's/^/— /')
-          python3 .github/taamarinbot.py "$FILE"
