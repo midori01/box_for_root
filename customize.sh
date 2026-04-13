@@ -1,13 +1,11 @@
 #!/system/bin/sh
 
-# Script configuration variables
 SKIPUNZIP=1
-SKIPMOUNT=false
+SKIPMOUNT=true
 PROPFILE=true
 POSTFSDATA=false
 LATESTARTSERVICE=true
 
-# Check installation conditions
 if [ "$BOOTMODE" != true ]; then
   abort "-----------------------------------------------------------"
   ui_print "! Please install in Magisk/KernelSU/APatch Manager"
@@ -30,14 +28,12 @@ else
   ui_print "— Magisk version: $MAGISK_VER ($MAGISK_VER_CODE)"
 fi
 
-# Set up service directory and clean old installations
 mkdir -p "${service_dir}"
 if [ -d "/data/adb/modules/box_for_magisk" ]; then
   rm -rf "/data/adb/modules/box_for_magisk"
   ui_print "— Old module deleted."
 fi
 
-# Extract files and configure directories
 ui_print "— Installing Box for Magisk/KernelSU/APatch"
 unzip -o "$ZIPFILE" -x 'META-INF/*' -x 'webroot/*' -d "$MODPATH" >&2
 if [ -d "/data/adb/box" ]; then
@@ -51,28 +47,21 @@ else
   mv "$MODPATH/box" /data/adb/
 fi
 
-# Directory creation and file extraction
 ui_print "— Create directories..."
-mkdir -p /data/adb/box/ /data/adb/box/run/ /data/adb/box/bin/xclash/
-mkdir -p $MODPATH/system/bin
+mkdir -p /data/adb/box/ /data/adb/box/run/ /data/adb/box/bin/
 
 ui_print "— Extracting..."
-ui_print "     ↳  uninstall.sh → $MODPATH"
-ui_print "     ↳  box_service.sh → ${service_dir}"
-ui_print "     ↳  sbfr → $MODPATH/system/bin"
 unzip -j -o "$ZIPFILE" 'uninstall.sh' -d "$MODPATH" >&2
 unzip -j -o "$ZIPFILE" 'box_service.sh' -d "${service_dir}" >&2
-unzip -j -o "$ZIPFILE" 'sbfr' -d "$MODPATH/system/bin" >&2
+unzip -j -o "$ZIPFILE" 'sbfr' -d "$MODPATH" >&2
 
-# Set permissions
 ui_print "— Setting permissions..."
 set_perm_recursive $MODPATH 0 0 0755 0644
 set_perm_recursive /data/adb/box/ 0 3005 0755 0644
 set_perm_recursive /data/adb/box/scripts/ 0 3005 0755 0700
 set_perm ${service_dir}/box_service.sh 0 0 0755
 set_perm $MODPATH/uninstall.sh 0 0 0755
-set_perm $MODPATH/system/bin/sbfr 0 0 0755
-
+set_perm $MODPATH/sbfr 0 0 0755
 chmod ugo+x ${service_dir}/box_service.sh $MODPATH/uninstall.sh /data/adb/box/scripts/*
 
 apply_mirror() {
@@ -86,15 +75,14 @@ apply_mirror() {
     NOW_TIME=$(date +%s)
     timeout 1 getevent -lc 1 2>&1 | grep KEY_VOLUME > "$TMPDIR/events"
     if [ $(( NOW_TIME - START_TIME )) -gt 9 ]; then
-      ui_print "— No input detected after 10 seconds..."
+      ui_print "— No input detected after 10 seconds. Default: Yes"
+      sed -i 's/use_ghproxy=.*/use_ghproxy="true"/' /data/adb/box/scripts/box.tool
+      break
+    elif grep -q KEY_VOLUMEUP "$TMPDIR/events"; then
       ui_print "— ghfast acceleration enabled."
       sed -i 's/use_ghproxy=.*/use_ghproxy="true"/' /data/adb/box/scripts/box.tool
       break
-    elif $(cat $TMPDIR/events | grep -q KEY_VOLUMEUP); then
-      ui_print "— ghfast acceleration enabled."
-      sed -i 's/use_ghproxy=.*/use_ghproxy="true"/' /data/adb/box/scripts/box.tool
-      break
-    elif $(cat $TMPDIR/events | grep -q KEY_VOLUMEDOWN); then
+    elif grep -q KEY_VOLUMEDOWN "$TMPDIR/events"; then
       ui_print "— ghfast acceleration disabled."
       sed -i 's/use_ghproxy=.*/use_ghproxy="false"/' /data/adb/box/scripts/box.tool
       break
@@ -129,59 +117,34 @@ find_bin() {
       *) action="all $bin" ;;
     esac
 
-  START_TIME=$(date +%s)
-  while true; do
-    NOW_TIME=$(date +%s)
-    timeout 1 getevent -lc 1 2>&1 | grep KEY_VOLUME > "$TMPDIR/events"
-    
-    if [ $(( NOW_TIME - START_TIME )) -gt 9 ]; then
-      ui_print "— No input detected after 10 seconds..."
-      if [ "$bin" = "clash" ]; then
-        ui_print "— Download enabled for clash."
+    START_TIME=$(date +%s)
+    while true; do
+      NOW_TIME=$(date +%s)
+      timeout 1 getevent -lc 1 2>&1 | grep KEY_VOLUME > "$TMPDIR/events"
+      
+      if [ $(( NOW_TIME - START_TIME )) -gt 9 ]; then
+        ui_print "— No input detected. Skipping $bin."
+        break
+      elif grep -q KEY_VOLUMEUP "$TMPDIR/events"; then
+        ui_print "— Download/Update starting..."
         /data/adb/box/scripts/box.tool $action
-      else
-        ui_print "— Download disabled for $bin."
+        break
+      elif grep -q KEY_VOLUMEDOWN "$TMPDIR/events"; then
+        ui_print "— Download disabled."
+        break
       fi
-      break
-    elif grep -q KEY_VOLUMEUP "$TMPDIR/events"; then
-      ui_print "— Download enabled."
-      /data/adb/box/scripts/box.tool $action
-      break
-    elif grep -q KEY_VOLUMEDOWN "$TMPDIR/events"; then
-      ui_print "— Download disabled."
-      break
-    fi
     done
   }
 
-  # List of binaries to check
-  for bin in yq curl sing-box v2fly xray hysteria; do
+  for bin in yq curl sing-box; do
     timeout 1 getevent -cl >/dev/null
-
     check_bin "$bin"
-    ui_print "— Do you want to download or update it?"
+    ui_print "— Do you want to download or update $bin?"
     ui_print "— [ Vol UP(+): Yes ]"
     ui_print "— [ Vol DOWN(-): No ]"
     handle_download "$bin"
     sleep 1
   done
-
-  # Special case for clash
-  if [ -e "$bin_dir/bin/xclash/mihomo" ]; then
-      ui_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      ui_print "— mihomo → ⭕ FOUND"
-      ui_print "-- Do you want to download or update clash?"
-      ui_print "— [ Vol UP(+): Yes ]"
-      ui_print "— [ Vol DOWN(-): No ]"
-      handle_download "clash"
-  else
-      ui_print "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      ui_print "— mihomo → ❌ NOT FOUND  "
-      ui_print "— Do you want to download or update mihomo?"
-      ui_print "— [ Vol UP(+): Yes ]"
-      ui_print "— [ Vol DOWN(-): No ]"
-      handle_download "clash"
-  fi
 }
 
 find_bin
@@ -190,27 +153,18 @@ timeout 1 getevent -cl >/dev/null
 restore_ini() {
   backup_ini="$temp_dir/settings.ini"
   target_ini="/data/adb/box/settings.ini"
-  
-  # List of keys to restore (separate with spaces)
   keys="network_mode bin_name ipv6 xclash_option renew update_subscription subscription_url_clash subscription_url_singbox name_clash_config clash_config name_provide_clash_config clash_provide_path enable_network_service_control use_module_on_wifi_disconnect use_module_on_wifi use_ssid_matching use_wifi_list_mode wifi_ssids_list inotify_log_enabled"
   
   for key in $keys; do
       value=$(grep "^$key=" "$backup_ini")
       if [ -n "$value" ]; then
-          # Escape special characters to make it safe for sed
           esc_value=$(printf '%s\n' "$value" | sed -e 's/[&/\]/\\&/g')
-          
           if grep -q "^$key=" "$target_ini"; then
-              # Replace old line
-              # sed -i "s|^$key=.*|$value|" "$target_ini"
               sed -i "s|^$key=.*|$esc_value|" "$target_ini"
           else
-              # Append at the end of the file
               echo "$value" >> "$target_ini"
           fi
           ui_print "— Restored: $key"
-      else
-          ui_print "— Skipped: $key not found in backup"
       fi
   done
 }
@@ -227,10 +181,10 @@ apply_ini() {
     if [ $(( NOW_TIME - START_TIME )) -gt 9 ]; then
       ui_print "— Skipped restoring settings.ini"
       break
-    elif $(cat $TMPDIR/events | grep -q KEY_VOLUMEUP); then
+    elif grep -q KEY_VOLUMEUP "$TMPDIR/events"; then
       restore_ini
       break
-    elif $(cat $TMPDIR/events | grep -q KEY_VOLUMEDOWN); then
+    elif grep -q KEY_VOLUMEDOWN "$TMPDIR/events"; then
       ui_print "— Skipped restoring settings.ini"
       break
     fi
@@ -240,88 +194,43 @@ apply_ini() {
 apply_ini
 timeout 1 getevent -cl >/dev/null
 
-# Restore backup configurations if present
 if [ "${backup_box}" = "true" ]; then
-  ui_print "— Restoring configurations..."
-  ui_print "     ↳  xray"
-  ui_print "     ↳  hysteria"
-  ui_print "     ↳  clash"
-  ui_print "     ↳  sing-box"
-  ui_print "     ↳  v2fly"
-  restore_config() {
-    config_dir="$1"
-    [ -d "${temp_dir}/${config_dir}" ] && cp -rf "${temp_dir}/${config_dir}/"* "/data/adb/box/${config_dir}/"
-  }
-  for dir in clash xray v2fly sing-box hysteria; do
-    restore_config "$dir"
-  done
+  ui_print "— Restoring sing-box configurations..."
+  [ -d "${temp_dir}/sing-box" ] && cp -rf "${temp_dir}/sing-box/"* "/data/adb/box/sing-box/"
 
   restore_kernel() {
     kernel_name="$1"
     if [ ! -f "/data/adb/box/bin/$kernel_name" ] && [ -f "${temp_dir}/bin/${kernel_name}" ]; then
-      ui_print "— Restoring kernel ${kernel_name}..."
+      ui_print "— Restoring ${kernel_name}..."
       cp -rf "${temp_dir}/bin/${kernel_name}" "/data/adb/box/bin/${kernel_name}"
     fi
   }
 
-  for kernel in curl yq xray sing-box v2fly hysteria xclash/mihomo xclash/premium; do
+  for kernel in yq curl sing-box; do
     restore_kernel "$kernel"
   done
 
-  ui_print "— Restoring..."
-  ui_print "     ↳  *.logs"
-  ui_print "     ↳  box.pid"
-  ui_print "     ↳  uid.list"
+  ui_print "— Restoring runtime data..."
   cp -rf "${temp_dir}/run/"* "/data/adb/box/run/"
-
-  ui_print "— Restoring..."
-  ui_print "     ↳  ap.list.cfg"
-  ui_print "     ↳  crontab.cfg"
-  ui_print "     ↳  package.list.cfg"
   cp -rf "${temp_dir}/ap.list.cfg" "/data/adb/box/ap.list.cfg"
   cp -rf "${temp_dir}/crontab.cfg" "/data/adb/box/crontab.cfg"
   cp -rf "${temp_dir}/package.list.cfg" "/data/adb/box/package.list.cfg"
 fi
 
-# create_resolv() {
-  # # Check if the resolv.conf file exists
-  # if [ ! -f /system/etc/resolv.conf ]; then
-    # # Ensure the target directory exists before writing the file
-    # mkdir -p "$MODPATH/system/etc/security/cacerts/"
-    # # Create resolv.conf with the specified nameservers
-    # cat > "$MODPATH/system/etc/resolv.conf" <<EOF
-# # nameserver 8.8.8.8
-# # nameserver 1.1.1.1
-# # nameserver 114.114.114.114
-# EOF
-  # fi
-  # ui_print "— create $MODPATH/system/etc/resolv.conf"
-# }
-# create_resolv
+[ -z "$(find /data/adb/box/bin -type f)" ] && sed -Ei 's/^description=(\[.*][[:space:]]*)?/description=[ 😱 Manual sing-box download required ] /g' $MODPATH/module.prop
 
-# Update module description if no kernel binaries are found
-[ -z "$(find /data/adb/box/bin -type f)" ] && sed -Ei 's/^description=(\[.*][[:space:]]*)?/description=[ 😱 Module installed but manual Kernel download required ] /g' $MODPATH/module.prop
-
-# Customize module name based on environment
 if [ "$KSU" = "true" ]; then
-  sed -i "s/name=.*/name=Box for KernelSU/g" $MODPATH/module.prop
+  sed -i "s/name=.*/name=Box for MidoriSU/g" $MODPATH/module.prop
 elif [ "$APATCH" = "true" ]; then
   sed -i "s/name=.*/name=Box for APatch/g" $MODPATH/module.prop
 else
-  sed -i "s/name=.*/name=Box for Magisk/g" $MODPATH/module.prop
+  sed -i "s/name=.*/name=Box4Pixel/g" $MODPATH/module.prop
 fi
 unzip -o "$ZIPFILE" 'webroot/*' -d "$MODPATH" >&2
 
-# Clean up temporary files
-ui_print "— Cleaning up leftover files"
-rm -rf /data/adb/box/bin/.bin $MODPATH/box $MODPATH/sbfr $MODPATH/box_service.sh
+ui_print "— Cleaning up"
+rm -rf /data/adb/box/bin/.bin $MODPATH/box $MODPATH/box_service.sh
 
-ui_print ""
-# Create a symbolic link to run /dev/sbfr as a shortcut to sbfr
-ln -sf "$MODPATH/system/bin/sbfr" /dev/sbfr
-ui_print "— Shortcut '/dev/sbfr' created."
-ui_print "     ↳  You can now run: su -c /dev/sbfr"
-ui_print ""
-# Complete installation
-ui_print "— Installation complete. Please reboot your device."
-ui_print "— Report issues to t.me.taamarin"
+ln -sf "$MODPATH/sbfr" /dev/sbfr
+ui_print "— Shortcut '/dev/sbfr' created. Run: su -c /dev/sbfr"
+ui_print "— Installation complete. Reboot device."
