@@ -1,6 +1,6 @@
 id=box_for_root
 name=Box for root
-version=v1.1989.64
+version=v2.0
 versionCode=20260413
 author=taamarin, Midori
 description=Use sing-box core for tunnel proxy on rooted Android devices.
