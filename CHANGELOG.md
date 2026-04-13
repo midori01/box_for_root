@@ -1,3 +1,6 @@
+#### Changelog v2.0 - 13-04-26
+- none
+
 #### Changelog v1.10.2 - 05-09-25
 - fix(scripts): use `/system/bin/sh` and add `curl` timeout options in box.tool
 - fix: escape special characters in restore_ini sed replacement
