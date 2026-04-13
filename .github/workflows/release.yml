@@ -41,8 +41,8 @@ jobs:
           {
             "version": "$VERSION",
             "versionCode": "$DATE_NUM",
-            "zipUrl": "https://github.com/taamarin/box_for_magisk/releases/download/$VERSION/box_for_root-$VERSION.zip",
-            "changelog": "https://github.com/taamarin/box_for_magisk/raw/master/CHANGELOG.md"
+            "zipUrl": "https://github.com/midori01/box_for_root/releases/download/$VERSION/box_for_root-$VERSION.zip",
+            "changelog": "https://github.com/midori01/box_for_root/raw/main/CHANGELOG.md"
           }
           EOF
 
