@@ -85,5 +85,5 @@ jobs:
           files: box_for_root-v*.zip
           generate_release_notes: true
           body: |
-            #### Changelog v${{ github.event.inputs.tag }}
+            #### Changelog ${{ github.event.inputs.tag }}
             ${{ github.event.inputs.changelog }}
