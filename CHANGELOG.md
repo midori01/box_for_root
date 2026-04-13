@@ -1,6 +1,3 @@
-#### Changelog v2.0.1 - 14-04-26
-- init ap.list.cfg and package.list.cfg
-
 #### Changelog v2.0 - 13-04-26
 - none
 
