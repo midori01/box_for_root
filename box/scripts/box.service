@@ -221,7 +221,7 @@ prepare_singbox() {
       # Set auto_route to false for non-"tun" network_mode
       sed -i 's/auto_route": true/auto_route": false/g' "${box_dir}/sing-box/"*.json
       # Set auto_detect_interface to false
-      sed -i 's/"auto_detect_interface": true/"auto_detect_interface": false/g' "${box_dir}/sing-box/"*.json
+      # sed -i 's/"auto_detect_interface": true/"auto_detect_interface": false/g' "${box_dir}/sing-box/"*.json
 
       # Check if "type" is "tproxy" in configuration
       if ! busybox grep -q '"type": "tproxy"' "${sing_config}"; then
